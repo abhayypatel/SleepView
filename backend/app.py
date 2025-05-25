@@ -35,27 +35,46 @@ def load_model_and_encoders():
     print("CWD:", os.getcwd(), "– listing:", os.listdir(os.getcwd()))
     
     try:
-        # Load the trained model
-        model_path = 'model.pkl'  # Try current directory first
-        if not os.path.exists(model_path):
-            model_path = os.path.join('..', 'model.pkl')  # Try parent directory
-            
-        print(f"Attempting to load model from: {model_path}")
-        print(f"Model file exists: {os.path.exists(model_path)}")
+        # Try multiple possible paths for the model file
+        possible_paths = [
+            'model.pkl',  # Current directory
+            os.path.join('backend', 'model.pkl'),  # In backend subdirectory
+            os.path.join('..', 'model.pkl'),  # Parent directory
+            os.path.join(os.path.dirname(__file__), 'model.pkl'),  # Same directory as this script
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'model.pkl'),  # Parent of script directory
+        ]
         
-        if not os.path.exists(model_path):
-            print("ERROR: Model file not found!")
+        model_path = None
+        for path in possible_paths:
+            print(f"Checking path: {path}")
+            if os.path.exists(path):
+                model_path = path
+                print(f"Found model at: {model_path}")
+                break
+        
+        if not model_path:
+            print("ERROR: Model file not found in any of the expected locations!")
+            print("Searched paths:", possible_paths)
             setup_encoders()
             return False
             
+        print(f"Attempting to load model from: {model_path}")
+        
         with open(model_path, 'rb') as f:
             try:
                 model_data = pickle.load(f)
-                print("✅ Pickle loaded successfully!")
+                print("Pickle loaded successfully!")
             except Exception as pickle_error:
-                print(f"❌ Pickle loading failed: {pickle_error}")
+                print(f"Pickle loading failed: {pickle_error}")
                 print("This is likely a numpy/scikit-learn version mismatch")
-                raise pickle_error
+                # Try to handle version compatibility issues
+                import pickle5 as pickle_alt
+                try:
+                    with open(model_path, 'rb') as f_alt:
+                        model_data = pickle_alt.load(f_alt)
+                    print("Loaded with pickle5 compatibility!")
+                except:
+                    raise pickle_error
             
         print(f"Model data type: {type(model_data)}")
         
@@ -73,11 +92,11 @@ def load_model_and_encoders():
             model = model_data
             setup_encoders()
             
-        print("✅ Model loaded successfully!")
+        print("Model loaded successfully!")
         return True
         
     except Exception as e:
-        print(f"❌ Error loading model: {e}")
+        print(f"Error loading model: {e}")
         import traceback
         traceback.print_exc()
         # Setup default encoders if model loading fails
@@ -251,7 +270,20 @@ def predict():
         
         # Make prediction
         if model is None:
-            return jsonify({'error': 'Model not loaded'}), 500
+            # Try to reload the model one more time
+            print("Model is None, attempting to reload...")
+            model_loaded = load_model_and_encoders()
+            if not model_loaded or model is None:
+                error_msg = 'Model not loaded. Please check server logs for details.'
+                print(f"CRITICAL ERROR: {error_msg}")
+                return jsonify({
+                    'error': error_msg,
+                    'debug_info': {
+                        'cwd': os.getcwd(),
+                        'files_in_cwd': os.listdir(os.getcwd()),
+                        'model_status': 'failed_to_load'
+                    }
+                }), 500
             
         # Get prediction and probabilities
         prediction = model.predict(processed_data)[0]
@@ -295,8 +327,41 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'model_loaded': model is not None,
-        'message': 'Sleep disorder prediction API is running'
+        'message': 'Sleep disorder prediction API is running',
+        'debug_info': {
+            'cwd': os.getcwd(),
+            'files_in_cwd': os.listdir(os.getcwd()),
+            'model_type': str(type(model)) if model else 'None',
+            'encoders_loaded': len(label_encoders) if label_encoders else 0,
+            'feature_columns_count': len(feature_columns) if feature_columns else 0
+        }
     })
+
+@app.route('/reload-model', methods=['POST'])
+def reload_model():
+    """Debug endpoint to manually reload the model"""
+    try:
+        print("Manual model reload requested...")
+        model_loaded = load_model_and_encoders()
+        
+        return jsonify({
+            'success': model_loaded,
+            'model_loaded': model is not None,
+            'message': 'Model reload completed' if model_loaded else 'Model reload failed',
+            'debug_info': {
+                'cwd': os.getcwd(),
+                'files_in_cwd': os.listdir(os.getcwd()),
+                'model_type': str(type(model)) if model else 'None',
+                'encoders_loaded': len(label_encoders) if label_encoders else 0,
+                'feature_columns_count': len(feature_columns) if feature_columns else 0
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Model reload failed with exception'
+        }), 500
 
 @app.route('/', methods=['GET'])
 def home():
@@ -307,6 +372,7 @@ def home():
         'endpoints': {
             '/predict': 'POST - Make sleep disorder prediction',
             '/health': 'GET - Health check',
+            '/reload-model': 'POST - Reload model',
             '/': 'GET - API information'
         },
         'model_status': 'loaded' if model is not None else 'not loaded'
@@ -320,8 +386,13 @@ if __name__ == '__main__':
     
     if model_loaded:
         print("✅ Model loaded successfully!")
+        print(f"Model type: {type(model)}")
+        print(f"Feature columns: {len(feature_columns)}")
+        print(f"Label encoders: {len(label_encoders)}")
     else:
         print("⚠️  Model not found, using default encoders")
+        print("⚠️  Predictions may not work correctly without the trained model")
+        print("⚠️  Please ensure model.pkl is available in the deployment")
     
     print("🚀 Starting Flask server...")
     
