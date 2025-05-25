@@ -266,7 +266,7 @@ const PredictionForm = () => {
 
         try {
             // Use production API URL - replace with your actual Render URL
-            const API_URL = process.env.REACT_APP_API_URL || 'https://sleepview-api.onrender.com';
+            const API_URL = process.env.REACT_APP_API_URL || 'https://sleepview.onrender.com';
 
             const response = await axios.post(`${API_URL}/predict`, formData, {
                 headers: {
