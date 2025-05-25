@@ -13,9 +13,10 @@ app = Flask(__name__)
 # Configure CORS properly for production
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000", "https://*.vercel.app", "https://*.netlify.app"],
+        "origins": "*",  # Allow all origins temporarily
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": False
     }
 })
 
