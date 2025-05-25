@@ -31,6 +31,9 @@ def load_model_and_encoders():
     """Load the trained model and create encoders based on training data"""
     global model, label_encoders, target_encoder, scaler, feature_columns
     
+    # Debug info
+    print("CWD:", os.getcwd(), "– listing:", os.listdir(os.getcwd()))
+    
     try:
         # Load the trained model
         model_path = 'model.pkl'  # Try current directory first
@@ -46,7 +49,13 @@ def load_model_and_encoders():
             return False
             
         with open(model_path, 'rb') as f:
-            model_data = pickle.load(f)
+            try:
+                model_data = pickle.load(f)
+                print("✅ Pickle loaded successfully!")
+            except Exception as pickle_error:
+                print(f"❌ Pickle loading failed: {pickle_error}")
+                print("This is likely a numpy/scikit-learn version mismatch")
+                raise pickle_error
             
         print(f"Model data type: {type(model_data)}")
         
