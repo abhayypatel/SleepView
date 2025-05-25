@@ -33,9 +33,9 @@ def load_model_and_encoders():
     
     try:
         # Load the trained model
-        model_path = os.path.join('..', 'model.pkl')
+        model_path = 'model.pkl'  # Try current directory first
         if not os.path.exists(model_path):
-            model_path = 'model.pkl'  # Try current directory
+            model_path = os.path.join('..', 'model.pkl')  # Try parent directory
             
         with open(model_path, 'rb') as f:
             model_data = pickle.load(f)
