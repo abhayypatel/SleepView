@@ -80,10 +80,30 @@ def load_model_and_encoders():
             scaler = model_data.get('scaler', None)
             feature_columns = model_data.get('feature_columns', [])
             print(f"Loaded model: {model_data.get('model_name', 'Unknown')}")
+            
+            # Validate model features
+            if hasattr(model, 'n_features_in_'):
+                print(f"Model expects {model.n_features_in_} features")
+                if len(feature_columns) != model.n_features_in_:
+                    print(f"WARNING: Feature columns ({len(feature_columns)}) don't match model's expected features ({model.n_features_in_})")
+                    print("Feature columns:", feature_columns)
+            
+            if hasattr(model, 'feature_names_in_'):
+                print("Model's feature names:", model.feature_names_in_)
         else:
             # If it's just the model, we'll need to recreate encoders
             model = model_data
             setup_encoders()
+            
+            # Validate model features
+            if hasattr(model, 'n_features_in_'):
+                print(f"Model expects {model.n_features_in_} features")
+                if len(feature_columns) != model.n_features_in_:
+                    print(f"WARNING: Feature columns ({len(feature_columns)}) don't match model's expected features ({model.n_features_in_})")
+                    print("Feature columns:", feature_columns)
+            
+            if hasattr(model, 'feature_names_in_'):
+                print("Model's feature names:", model.feature_names_in_)
             
         print("Model loaded successfully!")
         return True
@@ -135,8 +155,12 @@ def setup_encoders():
 def preprocess_input(data):
     """Preprocess input data to match training format"""
     try:
+        print("Starting preprocessing with input data:", data)
+        
         # Create DataFrame from input
         df = pd.DataFrame([data])
+        print("Initial DataFrame shape:", df.shape)
+        print("Initial columns:", list(df.columns))
         
         # Handle blood pressure N/A values with age-based averages
         if data.get('blood_pressure_systolic') == 'N/A' or data.get('blood_pressure_diastolic') == 'N/A':
@@ -154,6 +178,8 @@ def preprocess_input(data):
             df['blood_pressure_systolic'] = avg_systolic
             df['blood_pressure_diastolic'] = avg_diastolic
         
+        print("After blood pressure handling:", list(df.columns))
+        
         # Feature engineering (same as training)
         # 1. BMI Category to numeric
         bmi_mapping = {'Underweight': 1, 'Normal': 2, 'Overweight': 3, 'Obese': 4}
@@ -169,6 +195,8 @@ def preprocess_input(data):
         # Handle infinite values
         df['activity_steps_ratio'] = df['activity_steps_ratio'].replace([np.inf, -np.inf], np.nan)
         df['activity_steps_ratio'] = df['activity_steps_ratio'].fillna(df['activity_steps_ratio'].median())
+        
+        print("After feature engineering:", list(df.columns))
         
         # 4. Blood pressure category
         def categorize_bp(systolic, diastolic):
@@ -198,6 +226,8 @@ def preprocess_input(data):
         
         df['age_group'] = df['age'].apply(categorize_age)
         
+        print("After category creation:", list(df.columns))
+        
         # Convert numeric columns
         numeric_columns = ['age', 'sleep_duration', 'quality_of_sleep', 'physical_activity_level',
                           'stress_level', 'blood_pressure_systolic', 'blood_pressure_diastolic',
@@ -206,28 +236,41 @@ def preprocess_input(data):
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col])
         
+        print("After numeric conversion:", list(df.columns))
+        
         # Select and order features
+        print("Expected feature columns:", feature_columns)
         df_features = df[feature_columns].copy()
+        print("Selected features shape:", df_features.shape)
+        print("Selected features columns:", list(df_features.columns))
         
         # Encode categorical variables
         categorical_columns = ['gender', 'occupation', 'bmi_category', 'bp_category', 'age_group']
         
         for col in categorical_columns:
             if col in label_encoders:
-                # Handle unknown categories
                 try:
+                    print(f"Encoding {col} with values:", df_features[col].values)
                     df_features[col] = label_encoders[col].transform(df_features[col].astype(str))
-                except ValueError:
+                except ValueError as e:
+                    print(f"Error encoding {col}: {e}")
+                    print(f"Available categories for {col}:", label_encoders[col].classes_)
                     # If unknown category, use the most common one (index 0)
                     df_features[col] = 0
         
         # Fill any remaining NaN values
         df_features = df_features.fillna(df_features.median())
         
+        print("Final features shape:", df_features.shape)
+        print("Final features:", df_features.values)
+        
         return df_features.values
         
     except Exception as e:
         print(f"Error in preprocessing: {e}")
+        print("Current DataFrame state:")
+        print(df.head())
+        print("\nFeature columns:", feature_columns)
         raise e
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
@@ -243,6 +286,8 @@ def predict():
     try:
         # Get JSON data from request
         data = request.get_json()
+        print("\n=== Starting new prediction request ===")
+        print("Received data:", data)
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -256,14 +301,26 @@ def predict():
         
         missing_fields = [field for field in required_fields if field not in data or data[field] == '']
         if missing_fields:
+            print("Missing required fields:", missing_fields)
             return jsonify({'error': f'Missing required fields: {missing_fields}'}), 400
         
+        print("All required fields present")
+        
         # Preprocess the input data
-        processed_data = preprocess_input(data)
+        try:
+            processed_data = preprocess_input(data)
+            print("Data preprocessing successful")
+            print("Processed data shape:", processed_data.shape)
+        except Exception as preprocess_error:
+            print("Preprocessing error:", str(preprocess_error))
+            return jsonify({
+                'error': 'Data preprocessing failed',
+                'details': str(preprocess_error),
+                'data_received': data
+            }), 400
         
         # Make prediction
         if model is None:
-            # Try to reload the model one more time
             print("Model is None, attempting to reload...")
             model_loaded = load_model_and_encoders()
             if not model_loaded or model is None:
@@ -277,10 +334,21 @@ def predict():
                         'model_status': 'failed_to_load'
                     }
                 }), 500
-            
-        # Get prediction and probabilities
-        prediction = model.predict(processed_data)[0]
-        probabilities = model.predict_proba(processed_data)[0]
+        
+        try:
+            # Get prediction and probabilities
+            print("Making prediction with data shape:", processed_data.shape)
+            prediction = model.predict(processed_data)[0]
+            probabilities = model.predict_proba(processed_data)[0]
+            print("Prediction successful")
+        except Exception as predict_error:
+            print("Prediction error:", str(predict_error))
+            return jsonify({
+                'error': 'Prediction failed',
+                'details': str(predict_error),
+                'data_shape': processed_data.shape if processed_data is not None else 'None',
+                'model_type': str(type(model))
+            }), 500
         
         # Convert prediction back to original label
         if target_encoder:
@@ -308,11 +376,18 @@ def predict():
             'status': 'success'
         }
         
+        print("Prediction completed successfully")
         return jsonify(response)
         
     except Exception as e:
-        print(f"Prediction error: {e}")
-        return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
+        print(f"Unexpected error in prediction endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Prediction failed',
+            'details': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
