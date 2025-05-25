@@ -37,26 +37,40 @@ def load_model_and_encoders():
         if not os.path.exists(model_path):
             model_path = os.path.join('..', 'model.pkl')  # Try parent directory
             
+        print(f"Attempting to load model from: {model_path}")
+        print(f"Model file exists: {os.path.exists(model_path)}")
+        
+        if not os.path.exists(model_path):
+            print("ERROR: Model file not found!")
+            setup_encoders()
+            return False
+            
         with open(model_path, 'rb') as f:
             model_data = pickle.load(f)
             
+        print(f"Model data type: {type(model_data)}")
+        
         # Extract model and metadata
         if isinstance(model_data, dict):
+            print("Model data keys:", list(model_data.keys()))
             model = model_data['model']
             label_encoders = model_data.get('label_encoders', {})
             target_encoder = model_data.get('target_encoder', None)
             scaler = model_data.get('scaler', None)
             feature_columns = model_data.get('feature_columns', [])
+            print(f"Loaded model: {model_data.get('model_name', 'Unknown')}")
         else:
             # If it's just the model, we'll need to recreate encoders
             model = model_data
             setup_encoders()
             
-        print("Model loaded successfully!")
+        print("✅ Model loaded successfully!")
         return True
         
     except Exception as e:
-        print(f"Error loading model: {e}")
+        print(f"❌ Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         # Setup default encoders if model loading fails
         setup_encoders()
         return False
