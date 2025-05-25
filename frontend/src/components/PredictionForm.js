@@ -265,7 +265,15 @@ const PredictionForm = () => {
         setError('');
 
         try {
-            const response = await axios.post('http://localhost:5001/predict', formData);
+            // Use production API URL - replace with your actual Render URL
+            const API_URL = process.env.REACT_APP_API_URL || 'https://sleepview-api.onrender.com';
+
+            const response = await axios.post(`${API_URL}/predict`, formData, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
             navigate('/results', { state: { prediction: response.data, formData } });
         } catch (err) {
             setError(err.response?.data?.error || 'An error occurred while making the prediction. Please try again.');

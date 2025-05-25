@@ -10,10 +10,10 @@ warnings.filterwarnings('ignore')
 
 app = Flask(__name__)
 
-# Configure CORS properly
+# Configure CORS properly for production
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000"],
+        "origins": ["http://localhost:3000", "https://*.vercel.app", "https://*.netlify.app"],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
@@ -300,9 +300,8 @@ if __name__ == '__main__':
         print("⚠️  Model not found, using default encoders")
     
     print("🚀 Starting Flask server...")
-    print("📡 API will be available at: http://localhost:5001")
-    print("🔍 Health check: http://localhost:5001/health")
-    print("📝 Prediction endpoint: http://localhost:5001/predict")
     
-    # Run the Flask app
-    app.run(debug=True) 
+    # For production, don't specify host/port - let the platform handle it
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False) 
