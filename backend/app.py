@@ -67,14 +67,7 @@ def load_model_and_encoders():
             except Exception as pickle_error:
                 print(f"Pickle loading failed: {pickle_error}")
                 print("This is likely a numpy/scikit-learn version mismatch")
-                # Try to handle version compatibility issues
-                import pickle5 as pickle_alt
-                try:
-                    with open(model_path, 'rb') as f_alt:
-                        model_data = pickle_alt.load(f_alt)
-                    print("Loaded with pickle5 compatibility!")
-                except:
-                    raise pickle_error
+                raise pickle_error
             
         print(f"Model data type: {type(model_data)}")
         
