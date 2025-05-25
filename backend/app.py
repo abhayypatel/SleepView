@@ -51,9 +51,9 @@ def load_model_and_encoders():
         with open(model_path, 'rb') as f:
             try:
                 model_data = pickle.load(f)
-                print("✅ Pickle loaded successfully!")
+                print("Pickle loaded successfully!")
             except Exception as pickle_error:
-                print(f"❌ Pickle loading failed: {pickle_error}")
+                print(f"Pickle loading failed: {pickle_error}")
                 print("This is likely a numpy/scikit-learn version mismatch")
                 raise pickle_error
             
@@ -73,11 +73,11 @@ def load_model_and_encoders():
             model = model_data
             setup_encoders()
             
-        print("✅ Model loaded successfully!")
+        print("Model loaded successfully!")
         return True
         
     except Exception as e:
-        print(f"❌ Error loading model: {e}")
+        print(f"Error loading model: {e}")
         import traceback
         traceback.print_exc()
         # Setup default encoders if model loading fails
@@ -319,11 +319,11 @@ if __name__ == '__main__':
     model_loaded = load_model_and_encoders()
     
     if model_loaded:
-        print("✅ Model loaded successfully!")
+        print("Model loaded successfully!")
     else:
-        print("⚠️  Model not found, using default encoders")
+        print("Model not found, using default encoders")
     
-    print("🚀 Starting Flask server...")
+    print("Starting Flask server...")
     
     # For production, don't specify host/port - let the platform handle it
     import os
