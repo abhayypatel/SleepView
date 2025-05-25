@@ -186,6 +186,25 @@ def setup_encoders():
     
     print(f"Setup encoders completed with {len(feature_columns)} feature columns")
 
+# Initialize with default values to prevent empty state
+def initialize_defaults():
+    """Initialize default encoders and feature columns as fallback"""
+    global label_encoders, target_encoder, scaler, feature_columns
+    
+    if not label_encoders:
+        setup_encoders()
+    
+    if not feature_columns:
+        feature_columns = [
+            'gender', 'age', 'occupation', 'sleep_duration', 'quality_of_sleep',
+            'physical_activity_level', 'stress_level', 'bmi_category',
+            'blood_pressure_systolic', 'blood_pressure_diastolic', 'heart_rate', 'daily_steps',
+            'bmi_numeric', 'sleep_efficiency', 'activity_steps_ratio', 'bp_category', 'age_group'
+        ]
+
+# Initialize defaults immediately
+initialize_defaults()
+
 def preprocess_input(data):
     """Preprocess input data to match training format"""
     global feature_columns  # Move global declaration to the top
@@ -290,23 +309,38 @@ def preprocess_input(data):
         # Encode categorical variables BEFORE feature selection
         categorical_columns = ['gender', 'occupation', 'bmi_category', 'bp_category', 'age_group']
         
+        # Ensure we have label encoders - if not, set them up
+        if not label_encoders:
+            print("WARNING: No label encoders found, setting up default encoders...")
+            setup_encoders()
+        
         for col in categorical_columns:
-            if col in label_encoders and col in df.columns:
+            if col in df.columns:
                 try:
                     print(f"Encoding {col} with values:", df[col].values)
-                    # Handle unseen categories by using the first class
-                    df[col] = df[col].astype(str).apply(
-                        lambda x: x if x in label_encoders[col].classes_ else label_encoders[col].classes_[0]
-                    )
-                    df[col] = label_encoders[col].transform(df[col])
-                    print(f"Successfully encoded {col}")
+                    if col in label_encoders:
+                        # Handle unseen categories by using the first class
+                        df[col] = df[col].astype(str).apply(
+                            lambda x: x if x in label_encoders[col].classes_ else label_encoders[col].classes_[0]
+                        )
+                        df[col] = label_encoders[col].transform(df[col])
+                        print(f"Successfully encoded {col}")
+                    else:
+                        print(f"No encoder found for {col}, using default encoding")
+                        # Create a simple mapping for unknown encoders
+                        unique_vals = df[col].unique()
+                        mapping = {val: i for i, val in enumerate(unique_vals)}
+                        df[col] = df[col].map(mapping)
                 except ValueError as e:
                     print(f"Error encoding {col}: {e}")
-                    print(f"Available categories for {col}:", label_encoders[col].classes_)
+                    if col in label_encoders:
+                        print(f"Available categories for {col}:", label_encoders[col].classes_)
                     # If unknown category, use the most common one (index 0)
                     df[col] = 0
         
         print("After categorical encoding:", list(df.columns))
+        print("Sample of encoded data:")
+        print(df.head())
         
         # Now select and order features
         print("Expected feature columns:", feature_columns)
@@ -321,22 +355,42 @@ def preprocess_input(data):
         df_features = df[feature_columns].copy()
         print("Selected features shape:", df_features.shape)
         print("Selected features columns:", list(df_features.columns))
+        print("Data types after selection:")
+        print(df_features.dtypes)
         
         # Apply scaling if scaler exists (but only for non-categorical features)
         if scaler is not None:
-            print("Applying feature scaling")
-            df_features = pd.DataFrame(
-                scaler.transform(df_features),
-                columns=feature_columns,
-                index=df_features.index
-            )
-            print("Features shape after scaling:", df_features.shape)
+            try:
+                print("Applying feature scaling")
+                df_features = pd.DataFrame(
+                    scaler.transform(df_features),
+                    columns=feature_columns,
+                    index=df_features.index
+                )
+                print("Features shape after scaling:", df_features.shape)
+            except Exception as scaling_error:
+                print(f"Scaling failed: {scaling_error}")
+                print("Continuing without scaling...")
+        else:
+            print("No scaler available, skipping scaling")
         
-        # Fill any remaining NaN values
-        df_features = df_features.fillna(df_features.median())
+        # Fill any remaining NaN values - but only for numeric columns
+        print("Filling NaN values...")
+        for col in df_features.columns:
+            if df_features[col].dtype in ['object', 'string']:
+                print(f"Skipping median fill for non-numeric column: {col}")
+                df_features[col] = df_features[col].fillna(0)  # Fill categorical with 0
+            else:
+                if df_features[col].isna().any():
+                    median_val = df_features[col].median()
+                    print(f"Filling {col} NaN values with median: {median_val}")
+                    df_features[col] = df_features[col].fillna(median_val)
         
         print("Final features shape:", df_features.shape)
-        print("Final features:", df_features.values)
+        print("Final data types:")
+        print(df_features.dtypes)
+        print("Final features sample:")
+        print(df_features.head())
         
         return df_features.values
         
@@ -383,6 +437,11 @@ def predict():
             return jsonify({'error': f'Missing required fields: {missing_fields}'}), 400
         
         print("All required fields present")
+        
+        # Ensure we have all necessary components
+        if not feature_columns or not label_encoders:
+            print("Missing essential components, reinitializing...")
+            initialize_defaults()
         
         # Preprocess the input data
         try:
