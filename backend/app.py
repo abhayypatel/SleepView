@@ -78,17 +78,25 @@ def load_model_and_encoders():
             label_encoders = model_data.get('label_encoders', {})
             target_encoder = model_data.get('target_encoder', None)
             scaler = model_data.get('scaler', None)
-            feature_columns = model_data.get('feature_columns', [])
             
-            # Add fallback feature columns if none found
-            if not feature_columns:
-                print("No feature columns found in model data, using default list")
-                feature_columns = [
-                    'gender', 'age', 'occupation', 'sleep_duration', 'quality_of_sleep',
-                    'physical_activity_level', 'stress_level', 'bmi_category',
-                    'blood_pressure_systolic', 'blood_pressure_diastolic', 'heart_rate', 'daily_steps',
-                    'bmi_numeric', 'sleep_efficiency', 'activity_steps_ratio', 'bp_category', 'age_group'
-                ]
+            # Get feature columns from model data, with proper fallback
+            loaded_feature_columns = model_data.get('feature_columns', [])
+            
+            # Define the expected feature columns (same as training)
+            expected_feature_columns = [
+                'gender', 'age', 'occupation', 'sleep_duration', 'quality_of_sleep',
+                'physical_activity_level', 'stress_level', 'bmi_category',
+                'blood_pressure_systolic', 'blood_pressure_diastolic', 'heart_rate', 'daily_steps',
+                'bmi_numeric', 'sleep_efficiency', 'activity_steps_ratio', 'bp_category', 'age_group'
+            ]
+            
+            # Use loaded feature columns if available and valid, otherwise use expected
+            if loaded_feature_columns and len(loaded_feature_columns) > 0:
+                feature_columns = loaded_feature_columns
+                print(f"Using feature columns from model data: {len(feature_columns)} features")
+            else:
+                feature_columns = expected_feature_columns
+                print(f"Using fallback feature columns: {len(feature_columns)} features")
             
             print(f"Loaded model: {model_data.get('model_name', 'Unknown')}")
             
@@ -98,9 +106,17 @@ def load_model_and_encoders():
                 if len(feature_columns) != model.n_features_in_:
                     print(f"WARNING: Feature columns ({len(feature_columns)}) don't match model's expected features ({model.n_features_in_})")
                     print("Feature columns:", feature_columns)
+                    # If mismatch, use the expected feature columns
+                    if len(expected_feature_columns) == model.n_features_in_:
+                        feature_columns = expected_feature_columns
+                        print("Using expected feature columns to match model requirements")
             
             if hasattr(model, 'feature_names_in_'):
                 print("Model's feature names:", model.feature_names_in_)
+                # If model has feature names, use those
+                if len(model.feature_names_in_) > 0:
+                    feature_columns = list(model.feature_names_in_)
+                    print("Using feature names from trained model")
         else:
             # If it's just the model, we'll need to recreate encoders
             model = model_data
@@ -115,8 +131,13 @@ def load_model_and_encoders():
             
             if hasattr(model, 'feature_names_in_'):
                 print("Model's feature names:", model.feature_names_in_)
+                # If model has feature names, use those
+                if len(model.feature_names_in_) > 0:
+                    feature_columns = list(model.feature_names_in_)
+                    print("Using feature names from trained model")
             
         print("Model loaded successfully!")
+        print(f"Final feature columns ({len(feature_columns)}): {feature_columns}")
         return True
         
     except Exception as e:
@@ -155,18 +176,35 @@ def setup_encoders():
     # Create scaler
     scaler = StandardScaler()
     
-    # Define feature columns
+    # Define feature columns (ensure this matches training exactly)
     feature_columns = [
         'gender', 'age', 'occupation', 'sleep_duration', 'quality_of_sleep',
         'physical_activity_level', 'stress_level', 'bmi_category',
         'blood_pressure_systolic', 'blood_pressure_diastolic', 'heart_rate', 'daily_steps',
         'bmi_numeric', 'sleep_efficiency', 'activity_steps_ratio', 'bp_category', 'age_group'
     ]
+    
+    print(f"Setup encoders completed with {len(feature_columns)} feature columns")
 
 def preprocess_input(data):
     """Preprocess input data to match training format"""
+    global feature_columns  # Move global declaration to the top
+    
     try:
         print("Starting preprocessing with input data:", data)
+        print(f"Global feature_columns length: {len(feature_columns)}")
+        print(f"Global feature_columns: {feature_columns}")
+        
+        # Ensure feature_columns is not empty
+        if not feature_columns or len(feature_columns) == 0:
+            print("ERROR: feature_columns is empty! Setting up default columns...")
+            feature_columns = [
+                'gender', 'age', 'occupation', 'sleep_duration', 'quality_of_sleep',
+                'physical_activity_level', 'stress_level', 'bmi_category',
+                'blood_pressure_systolic', 'blood_pressure_diastolic', 'heart_rate', 'daily_steps',
+                'bmi_numeric', 'sleep_efficiency', 'activity_steps_ratio', 'bp_category', 'age_group'
+            ]
+            print(f"Set feature_columns to default: {len(feature_columns)} features")
         
         # Create DataFrame from input
         df = pd.DataFrame([data])
@@ -272,6 +310,7 @@ def preprocess_input(data):
         
         # Now select and order features
         print("Expected feature columns:", feature_columns)
+        print(f"Expected feature columns length: {len(feature_columns)}")
         
         # Ensure all feature columns exist
         missing_features = [col for col in feature_columns if col not in df.columns]
