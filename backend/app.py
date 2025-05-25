@@ -191,17 +191,27 @@ def preprocess_input(data):
         
         print("After blood pressure handling:", list(df.columns))
         
+        # Convert numeric columns first
+        numeric_columns = ['age', 'sleep_duration', 'quality_of_sleep', 'physical_activity_level',
+                          'stress_level', 'blood_pressure_systolic', 'blood_pressure_diastolic',
+                          'heart_rate', 'daily_steps']
+        
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col])
+        
+        print("After numeric conversion:", list(df.columns))
+        
         # Feature engineering (same as training)
         # 1. BMI Category to numeric
         bmi_mapping = {'Underweight': 1, 'Normal': 2, 'Overweight': 3, 'Obese': 4}
         df['bmi_numeric'] = df['bmi_category'].map(bmi_mapping)
         
         # 2. Sleep efficiency
-        df['sleep_efficiency'] = pd.to_numeric(df['quality_of_sleep']) / pd.to_numeric(df['sleep_duration'])
+        df['sleep_efficiency'] = df['quality_of_sleep'] / df['sleep_duration']
         
         # 3. Activity to steps ratio (handle division by zero)
-        daily_steps_safe = pd.to_numeric(df['daily_steps']).replace(0, 1)
-        df['activity_steps_ratio'] = pd.to_numeric(df['physical_activity_level']) / (daily_steps_safe / 1000)
+        daily_steps_safe = df['daily_steps'].replace(0, 1)
+        df['activity_steps_ratio'] = df['physical_activity_level'] / (daily_steps_safe / 1000)
         
         # Handle infinite values
         df['activity_steps_ratio'] = df['activity_steps_ratio'].replace([np.inf, -np.inf], np.nan)
@@ -239,23 +249,41 @@ def preprocess_input(data):
         
         print("After category creation:", list(df.columns))
         
-        # Convert numeric columns
-        numeric_columns = ['age', 'sleep_duration', 'quality_of_sleep', 'physical_activity_level',
-                          'stress_level', 'blood_pressure_systolic', 'blood_pressure_diastolic',
-                          'heart_rate', 'daily_steps']
+        # Encode categorical variables BEFORE feature selection
+        categorical_columns = ['gender', 'occupation', 'bmi_category', 'bp_category', 'age_group']
         
-        for col in numeric_columns:
-            df[col] = pd.to_numeric(df[col])
+        for col in categorical_columns:
+            if col in label_encoders and col in df.columns:
+                try:
+                    print(f"Encoding {col} with values:", df[col].values)
+                    # Handle unseen categories by using the first class
+                    df[col] = df[col].astype(str).apply(
+                        lambda x: x if x in label_encoders[col].classes_ else label_encoders[col].classes_[0]
+                    )
+                    df[col] = label_encoders[col].transform(df[col])
+                    print(f"Successfully encoded {col}")
+                except ValueError as e:
+                    print(f"Error encoding {col}: {e}")
+                    print(f"Available categories for {col}:", label_encoders[col].classes_)
+                    # If unknown category, use the most common one (index 0)
+                    df[col] = 0
         
-        print("After numeric conversion:", list(df.columns))
+        print("After categorical encoding:", list(df.columns))
         
-        # Select and order features
+        # Now select and order features
         print("Expected feature columns:", feature_columns)
+        
+        # Ensure all feature columns exist
+        missing_features = [col for col in feature_columns if col not in df.columns]
+        if missing_features:
+            print(f"Missing features: {missing_features}")
+            raise ValueError(f"Missing required features: {missing_features}")
+        
         df_features = df[feature_columns].copy()
         print("Selected features shape:", df_features.shape)
         print("Selected features columns:", list(df_features.columns))
         
-        # Apply scaling if scaler exists
+        # Apply scaling if scaler exists (but only for non-categorical features)
         if scaler is not None:
             print("Applying feature scaling")
             df_features = pd.DataFrame(
@@ -264,20 +292,6 @@ def preprocess_input(data):
                 index=df_features.index
             )
             print("Features shape after scaling:", df_features.shape)
-        
-        # Encode categorical variables
-        categorical_columns = ['gender', 'occupation', 'bmi_category', 'bp_category', 'age_group']
-        
-        for col in categorical_columns:
-            if col in label_encoders:
-                try:
-                    print(f"Encoding {col} with values:", df_features[col].values)
-                    df_features[col] = label_encoders[col].transform(df_features[col].astype(str))
-                except ValueError as e:
-                    print(f"Error encoding {col}: {e}")
-                    print(f"Available categories for {col}:", label_encoders[col].classes_)
-                    # If unknown category, use the most common one (index 0)
-                    df_features[col] = 0
         
         # Fill any remaining NaN values
         df_features = df_features.fillna(df_features.median())
@@ -290,8 +304,12 @@ def preprocess_input(data):
     except Exception as e:
         print(f"Error in preprocessing: {e}")
         print("Current DataFrame state:")
-        print(df.head())
+        if 'df' in locals():
+            print(df.head())
+            print("DataFrame columns:", list(df.columns))
         print("\nFeature columns:", feature_columns)
+        import traceback
+        traceback.print_exc()
         raise e
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])

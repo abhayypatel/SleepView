@@ -230,6 +230,61 @@ Check API health status.
 #### `GET /`
 Get API information and endpoints.
 
+## 🔧 Recent Bug Fixes
+
+### Fixed: Empty Feature Array Error (v1.1.0)
+**Issue**: The prediction endpoint was returning "Found array with 0 feature(s)" error.
+
+**Root Cause**: The preprocessing pipeline was trying to select features before encoding categorical variables, resulting in an empty feature array.
+
+**Solution**: Reordered the preprocessing steps to:
+1. Handle missing values
+2. Convert numeric columns  
+3. Create engineered features
+4. **Encode categorical variables FIRST**
+5. **Then select features**
+6. Apply scaling
+7. Make prediction
+
+**Status**: ✅ Fixed and tested - predictions now work correctly with proper feature engineering.
+
+---
+
+## 🚀 Deployment
+
+### Backend Deployment (Render)
+
+1. **Push to GitHub**: Ensure your latest code is pushed to your repository
+2. **Deploy on Render**:
+   - Connect your GitHub repository
+   - Set build command: `pip install -r requirements.txt`
+   - Set start command: `python app.py`
+   - Ensure `model.pkl` is in the repository root or backend folder
+
+### Frontend Deployment (Vercel)
+
+1. **Environment Variables**: Set `REACT_APP_API_URL` to your backend URL
+2. **Deploy**: Connect your GitHub repository to Vercel
+3. **Build Settings**: 
+   - Build command: `npm run build`
+   - Output directory: `build`
+
+### Local Development
+
+1. **Backend**: 
+   ```bash
+   cd backend
+   PORT=5001 python3 app.py
+   ```
+
+2. **Frontend**:
+   ```bash
+   cd frontend
+   npm start
+   ```
+   
+   The frontend will automatically use `http://localhost:5001` for API calls via `.env.local`.
+
 ## 🚨 Important Disclaimers
 
 ### Medical Disclaimer
