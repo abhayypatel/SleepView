@@ -79,6 +79,17 @@ def load_model_and_encoders():
             target_encoder = model_data.get('target_encoder', None)
             scaler = model_data.get('scaler', None)
             feature_columns = model_data.get('feature_columns', [])
+            
+            # Add fallback feature columns if none found
+            if not feature_columns:
+                print("No feature columns found in model data, using default list")
+                feature_columns = [
+                    'gender', 'age', 'occupation', 'sleep_duration', 'quality_of_sleep',
+                    'physical_activity_level', 'stress_level', 'bmi_category',
+                    'blood_pressure_systolic', 'blood_pressure_diastolic', 'heart_rate', 'daily_steps',
+                    'bmi_numeric', 'sleep_efficiency', 'activity_steps_ratio', 'bp_category', 'age_group'
+                ]
+            
             print(f"Loaded model: {model_data.get('model_name', 'Unknown')}")
             
             # Validate model features
@@ -243,6 +254,16 @@ def preprocess_input(data):
         df_features = df[feature_columns].copy()
         print("Selected features shape:", df_features.shape)
         print("Selected features columns:", list(df_features.columns))
+        
+        # Apply scaling if scaler exists
+        if scaler is not None:
+            print("Applying feature scaling")
+            df_features = pd.DataFrame(
+                scaler.transform(df_features),
+                columns=feature_columns,
+                index=df_features.index
+            )
+            print("Features shape after scaling:", df_features.shape)
         
         # Encode categorical variables
         categorical_columns = ['gender', 'occupation', 'bmi_category', 'bp_category', 'age_group']
