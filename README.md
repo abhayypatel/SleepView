@@ -72,7 +72,7 @@ npm start
 ## 🌐 Example API Call
 
 ### POST /predict
-```bash
+```
 {
   "gender": "Male",
   "age": 30,
@@ -90,7 +90,7 @@ npm start
 ```
 
 ### Response
-```bash
+```
 {
   "prediction": "None",
   "confidence": 0.95,
