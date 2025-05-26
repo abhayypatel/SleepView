@@ -77,9 +77,9 @@ npm start
 ```
 {
   "gender": "Male",
-  "age": 30,
+  "age": 35,
   "occupation": "Software Engineer",
-  "sleep_duration": 7,
+  "sleep_duration": 7.5,
   "quality_of_sleep": 8,
   "physical_activity_level": 60,
   "stress_level": 4,
@@ -94,12 +94,11 @@ npm start
 ### Response
 ```
 {
-  "prediction": "None",
-  "confidence": 0.95,
+  "prediction": "Insomnia",
+  "confidence": 0.602,
   "probabilities": {
-    "None": 0.95,
-    "Sleep Apnea": 0.03,
-    "Insomnia": 0.02
+    "Sleep Apnea": 0.398,
+    "Insomnia": 0.602
   },
   "status": "success"
 }
