@@ -67,6 +67,7 @@ npm install
 npm start
 # Opens http://localhost:3000
 ```
+---
 
 ## Example API Call
 
