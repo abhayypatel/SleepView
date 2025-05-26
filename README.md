@@ -69,7 +69,7 @@ npm start
 ```
 ---
 
-## Example API Call
+## 🌐 Example API Call
 
 ### POST /predict
 ```bash
