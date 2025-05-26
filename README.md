@@ -4,6 +4,8 @@ SleepView is a full-stack web app that uses machine learning to predict sleep di
 
 [![SleepView](https://img.shields.io/badge/SleepView-AI%20Sleep%20Prediction-6366f1?style=for-the-badge)](https://github.com/abhayypatel/SleepView)
 
+**LIVE DEMO**: [Click Here](https://sleep-view.vercel.app/))
+
 ---
 
 ## 🔍 Features
