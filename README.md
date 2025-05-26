@@ -10,7 +10,7 @@ SleepView is a full-stack web app that uses machine learning to predict sleep di
 
 ## 🔍 Features
 
-- Predicts **Sleep Apnea**, **Insomnia**, or **No Disorder**
+- Predicts **Sleep Apnea** and **Insomnia**
 - Works in real-time with confidence scores
 - Clean React frontend + Flask backend
 - Models: **XGBoost**, **Random Forest**, **Logistic Regression**
